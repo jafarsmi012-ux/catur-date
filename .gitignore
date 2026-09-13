@@ -1,0 +1,18 @@
+# Vercel
+.vercel
+
+# Node
+node_modules/
+
+# Rahasia & sertifikat lokal
+.env
+.env.*
+!.env.example
+certs/
+*.pem
+*.key
+*.crt
+
+# Sementara
+tmp/
+gui-test-screenshots/

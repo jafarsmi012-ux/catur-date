@@ -1,0 +1,19 @@
+{
+  "name": "catur-romantis",
+  "version": "1.0.0",
+  "description": "Permainan catur romantis 2 pemain dengan chat & suara (Tencent TIM + TRTC), mobile friendly",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "license": "MIT"
+}
