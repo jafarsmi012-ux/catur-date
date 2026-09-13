@@ -22,6 +22,18 @@ const ROOT = path.join(__dirname, '..');
 const configHandler = require(path.join(ROOT, 'api', 'config.js'));
 const usersigHandler = require(path.join(ROOT, 'api', 'usersig.js'));
 
+// Jaga-jaga: server lokal ini HANYA untuk pengembangan (npm start).
+// Bila berjalan tanpa file statis (mis. terpilih sebagai entry oleh Vercel
+// legacy), berhenti dulu dengan pesan yang jelas alih-alih 404 semua aset.
+const STATIC_ROOT = path.join(ROOT, 'index.html');
+if (!fs.existsSync(STATIC_ROOT)) {
+  console.error('');
+  console.error('  ⚠ local/server.js tidak boleh dipakai sebagai deploy.');
+  console.error('  Pastikan di Vercel framework diset "Other" (proyek ini statis + api/).');
+  console.error('');
+  process.exit(1);
+}
+
 const PORT = Number(process.env.PORT || 3100);
 const USE_HTTPS = process.env.USE_HTTPS === '1';
 

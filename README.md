@@ -61,8 +61,13 @@ untuk pemakaian pribadi.
    ```
    (`.env` otomatis terkecuali oleh `.gitignore` — SECRETKEY aman.)
 2. Buka [vercel.com](https://vercel.com) → **Add New → Project** → pilih repo
-   tadi → **Deploy** (semua setting default sudah cocok; framework
-   auto-detect "Other", build tidak diperlukan).
+   tadi. Di **Build and Output Settings** set **Framework Preset = Other**
+   (Build Command kosong, Output Directory kosong) → **Deploy**. Ini penting:
+   proyek ini adalah frontend statis + fungsi `/api/*`, **bukan** aplikasi Node
+   yang dijalankan dengan `npm start` (itulah yang menyebabkan semua aset 404 —
+   `local/server.js` dianggap sebagai entry aplikasi dan menyajikan direktori
+   salah). `vercel.json` sudah memastikan preset `Other`, jadi cukup pilih
+   "Other" lalu Deploy.
 3. Set environment variables: **Project → Settings → Environment Variables**:
    - `SDKAPPID` = angka SDKAppID aplikasi Tencent Cloud kamu
    - `SECRETKEY` = SecretKey aplikasi

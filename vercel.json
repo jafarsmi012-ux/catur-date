@@ -1,4 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true
+  "framework": null,
+  "cleanUrls": true,
+  "buildCommand": "echo 'Statis + serverless functions, tanpa build server'",
+  "outputDirectory": ".",
+  "functions": {
+    "api/**/*.js": { "runtime": "nodejs20.x" }
+  }
 }
