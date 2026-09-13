@@ -1,8 +1,12 @@
 # ♕ Catur Romantis 💕
 
-Permainan catur untuk kamu dan pacar — berdua, langsung dari HP.
-Tema romantis merah muda, responsif untuk layar ponsel, plus **chat teks** dan
-**voice call (suara)** berbasis layanan Tencent Cloud (Chat/IM + TRTC).
+Permainan catur untuk kamu dan pacar — berdua, langsung dari HP (LDR beda
+kota pun bisa). Tema romantis merah muda, responsif untuk layar ponsel, plus
+**chat teks** dan **voice call** yang berjalan **langsung antar browser**
+(P2P WebRTC, memakai pustaka [Trystero](https://github.com/dmotz/trystero)).
+
+> **Gratis dan tanpa setup apa pun.** Tidak perlu akun cloud, API key,
+> `.env`, atau server backend — cukup satu URL yang bisa dibuka berdua.
 
 ## Fitur
 
@@ -11,7 +15,7 @@ Tema romantis merah muda, responsif untuk layar ponsel, plus **chat teks** dan
 - 📱 **Mobile-first** — papan besar, sentuh satu ketukan untuk pilih & taruh,
   aman dari zoom tak sengaja, mendukung safe-area (notch)
 - 💬 **Chat real-time** — bubble chat, kumpulan emoji cepat, badge belum-dibaca
-- 🎙️ **Voice streaming** — bicara sambil main (Tencent TRTC), indikator
+- 🎙️ **Voice streaming** — bicara sambil main (mic langsung P2P), indikator
   "bersuara 🔊" saat pacarmu bicara
 - 💌 **Kirim hati** — animasi hati melayang di layar pacarmu
 - ↩️ **Undo** (online: minta izin lawan), 🤝 **tawari remis**, 🏳️ **menyerah**, 🔁 **rematch**
@@ -19,132 +23,89 @@ Tema romantis merah muda, responsif untuk layar ponsel, plus **chat teks** dan
 - 🖤 **Mode satu HP** — main berdua di satu layar tanpa perlu apa pun
 - 🔀 **Balik papan** untuk pemain hitam
 
+## Cara Main Online (dua HP, beda kota)
+
+1. Deploy sekali saja (lihat di bawah) atau jalankan `npm start` di PC dan
+   buka dari browser HP masing-masing lewat URL publik.
+2. Kamu dan pacar buka **URL yang sama**.
+3. Di tab **Online**: isi nama masing-masing (boleh sama, ID internal dibuat
+   unik otomatis) dan **kode kamar yang sama** (mis. `sayang`) → **Masuk 💕**.
+4. Yang tersambung duluan jadi **putih**, yang kedua **hitam** — papan hitam
+   otomatis terbalik. Warna stabil walau salah satu me-refresh halaman
+   (pemain yang permainannya masih berjalan mempertahankan warnanya).
+5. Tekan 🎙️ untuk menyalakan suara; chat & ❤️ ada di drawer.
+
+Semua traffic (langkah, chat, audio) mengalir **langsung antara dua browser**
+kalian lewat WebRTC; jaringan publik Nostr hanya dipakai untuk saling
+mengenalkan (pertukaran SDP terenkripsi). Karena itu:
+
+- **Butuh HTTPS** untuk mikrofon — URL Vercel/GitHub Pages sudah HTTPS.
+- Bila kedua HP berada di jaringan dengan firewall NAT yang sangat ketat,
+  koneksi P2P kadang gagal tembus (jarang terjadi di seluler/4G-5G).
+
 ## Struktur Proyek (kompatibel Vercel)
 
 ```
 index.html, css/, js/, vendor/   # frontend statis (di root — konvensi Vercel)
-api/config.js                    # GET /api/config
-api/usersig.js                   # GET /api/usersig?user=… (tanda tangan UserSig)
-api/lib/LibGenerateTestUserSig.js  # generator UserSig resmi Tencent (HMAC-SHA256)
-local/server.js                  # server Express untuk jalan LOKAL saja
+vendor/trystero.js               # pustaka P2P (hasil build, sudah di-commit)
+vendor/trystero-entry.mjs        # sumber bundling (lihat "Menyusun ulang vendor")
+local/server.js                  # server statis nol-dependensi untuk development
 ```
 
-Endpoint API ditulis sebagai *serverless functions* Vercel (`/api/*.js`),
-sekaligus dipakai ulang oleh `server.js` saat `npm start` di komputer sendiri —
-satu kode, dua cara jalan.
+Tidak ada `/api/*` lagi — dulu ada (Tencent UserSig), sekarang tidak diperlukan.
+
+## Deploy ke Vercel (rekomendasi utama)
+
+Vercel memberi HTTPS otomatis (wajib untuk mic) dan gratis untuk pemakaian
+pribadi.
+
+1. Push kode ke GitHub (repo ini sudah punya `origin`).
+2. Buka [vercel.com](https://vercel.com) → **Add New → Project** → pilih repo.
+   Di **Build and Output Settings** set **Framework Preset = Other**
+   (Build Command kosong, Output Directory kosong) — `vercel.json` sudah
+   mengatur preset statis, jadi cukup Deploy.
+3. Buka URL hasilnya dari kedua HP. Selesai — tidak ada environment variable
+   yang perlu diisi.
+
+Setiap `git push` otomatis redeploy.
 
 ## Menjalankan di Komputer Sendiri (opsional)
 
 ```bash
-npm install
-npm start
+node local/server.js        # http://localhost:3100
 ```
 
-Buka `http://localhost:3100` (IPv4 & IPv6). Untuk main dari HP di WiFi yang
-sama, buka alamat LAN yang tercetak di terminal (mis. `http://192.168.x.x:3100`).
+`npm install` **tidak diperlukan** untuk ini (server nol-dependensi). Untuk
+mencoba mic dari HP di WiFi yang sama: `USE_HTTPS=1 node local/server.js`
+(butuh `openssl` di PATH; terima peringatan sertifikat self-signed di HP).
 
-> Port default **3100** agar tidak bentrok dengan aplikasi lain di port 3000.
-> Ganti lewat `PORT` di `.env`.
+> Port default **3100**; ganti dengan `PORT=8080`.
 
-## Deploy ke Vercel (rekomendasi utama)
+## Menyusun ulang vendor (hanya bila perlu)
 
-Vercel memberi HTTPS otomatis (wajib untuk izin mikrofon/voice) dan gratis
-untuk pemakaian pribadi.
-
-1. Push kode ke GitHub:
-   ```bash
-   git init
-   git add .
-   git commit -m "catur romantis"
-   git remote add origin https://github.com/USER/catur-romantis.git
-   git push -u origin main
-   ```
-   (`.env` otomatis terkecuali oleh `.gitignore` — SECRETKEY aman.)
-2. Buka [vercel.com](https://vercel.com) → **Add New → Project** → pilih repo
-   tadi. Di **Build and Output Settings** set **Framework Preset = Other**
-   (Build Command kosong, Output Directory kosong) → **Deploy**. Ini penting:
-   proyek ini adalah frontend statis + fungsi `/api/*`, **bukan** aplikasi Node
-   yang dijalankan dengan `npm start` (itulah yang menyebabkan semua aset 404 —
-   `local/server.js` dianggap sebagai entry aplikasi dan menyajikan direktori
-   salah). `vercel.json` sudah memastikan preset `Other`, jadi cukup pilih
-   "Other" lalu Deploy.
-3. Set environment variables: **Project → Settings → Environment Variables**:
-   - `SDKAPPID` = angka SDKAppID aplikasi Tencent Cloud kamu
-   - `SECRETKEY` = SecretKey aplikasi
-   lalu **Deployments → … → Redeploy**.
-4. Buka URL hasil deploy (mis. `https://catur-romantis.vercel.app`) dari HP
-   kamu dan pacarmu — isi kode kamar yang sama, tekan **Mulai 💕**, lalu 🎙️
-   untuk voice.
-
-Catatan: tier Hobby Vercel tidak punya batas waktu untuk fungsi sekali-panggil
-seperti `/api/usersig` (prosesnya mikrodetik), jadi aman.
-
-## Bagaimana dengan Cloudflare Pages?
-
-**Kurang cocok** untuk proyek ini. Pages Functions berjalan di runtime
-Cloudflare Workers, bukan Node.js — generator UserSig kami memakai
-`crypto.createSign` (ECDSA) dan `zlib.deflateSync` dari Node yang tidak
-tersedia di Workers. Pilihan yang tetap mungkin di ekosistem Cloudflare:
-
-- **Cloudflare Tunnel** (bukan Pages): server Node tetap di PC rumah, dapat
-  URL HTTPS publik:
-  ```bash
-  cloudflared tunnel --url http://localhost:3100
-  ```
-- **Cloudflare Workers**: memerlukan penulisan ulang signing ke WebCrypto —
-  besar kemungkinan bisa, tapi di luar cakupan proyek ini.
-
-Untuk host statis + functions Node: **Vercel** (atas), **Render**, **Railway**,
-atau VPS + Nginx semuanya kompatibel tanpa perubahan kode.
-
-## Mengaktifkan Chat & Suara (Tencent Cloud)
-
-1. Daftar/masuk di [Tencent Cloud Console](https://console.cloud.tencent.com/).
-2. Buka layanan **实时音视频 TRTC** (atau **Chat/即时通信 IM** — keduanya
-   memakai `SDKAppID` yang sama) dan buat aplikasi:
-   https://console.cloud.tencent.com/trtc/app/create
-3. Di **应用管理** (Application Management), catat **SDKAppID** dan
-   **SecretKey / 密钥**.
-4. Di hosting (Vercel dsb.) set `SDKAPPID` & `SECRETKEY` sebagai environment
-   variables — atau untuk jalan lokal, salin `.env.example` → `.env` lalu isi.
-
-### Bermain terpisah (dua HP)
-
-1. Kamu dan pacar buka URL yang sama.
-2. Isi nama masing-masing, masukkan **kode kamar yang sama** (mis. `sayang`),
-   tekan **Mulai 💕**.
-3. Yang masuk duluan otomatis jadi **putih**; yang kedua jadi **hitam**
-   (papannya otomatis dibalik).
-4. Tekan 🎙️ untuk menyalakan suara.
-
-### Catatan penting voice / mikrofon
-
-Browser hanya mengizinkan mikrofon pada **HTTPS** atau `localhost`:
-
-- Di Vercel/Render/Railway/VPS + Let's Encrypt: HTTPS sudah ada, voice langsung bisa.
-- Jalan lokal via `http://192.168.x.x:3100` → chat jalan, **voice tidak bisa**;
-  aktifkan `USE_HTTPS=1` di `.env` (server membuat sertifikat self-signed di
-  `certs/`, butuh `openssl` di PATH) dan buka `https://192.168.x.x:3100`,
-  terima peringatan sertifikat di HP.
-
-### Keamanan
-
-`SECRETKEY` **hanya ada di server** (environment variable) — browser tidak
-pernah melihatnya. Frontend meminta *UserSig* (token tanda tangan, kedaluwarsa
-180 hari) dari endpoint `/api/usersig`.
+```bash
+npm install                # devDependencies: trystero + esbuild
+npm run vendor             # -> vendor/trystero.js (sudah ikut ter-commit)
+```
 
 ## Catatan Teknis
 
-- **Sinkronisasi langkah**: setiap langkah dikirim sebagai pesan kustom
-  (`TIMCustomElem`) ke grup chat `catur-<kode kamar>`; pesan memuat FEN untuk
-  pemulihan bila terjadi desinkronisasi.
-- **Voice**: room TRTC numerik di-hash dari kode kamar, mode RTC audio-murni,
-  langganan otomatis + evaluasi volume untuk indikator bicara.
-- **Tidak ada state di server** — semua lewat Tencent Cloud; server hanya
-  menyajikan file statis + dua endpoint kecil.
+- **Transport**: `js/net.js` membungkus Trystero (strategi Nostr). Satu action
+  `proto` membawa semua event game sebagai JSON `{ a: aksi, from, ...data }`.
+- **Sinkronisasi langkah**: tiap langkah dikirim bersama FEN papan; bila
+  terjadi desinkron, FEN dipakai untuk pemulihan.
+- **Warna**: saat pairing, kedua sisi menghitung
+  `selfId-saya < selfId-lawan` (komplemen pasti); rejoin saat game berjalan →
+  pengikut mengambil kebalikan warna yang diumumkan host lewat `hello_ack`.
+- **Voice**: `getUserMedia` → `room.addStream` (audio-track tunggal),
+  volume-meter AudioContext untuk indikator bicara, `removeStream` + stop
+  tracks saat mati.
+- **Tidak ada state server** — server hanya menyajikan file statis.
 
 ## Skenario yang Sudah Diuji
 
 - Mode satu HP: pilih & langkah (e2–e4), skakmat (Fool's mate) + modal hasil,
   undo, kirim hati, panel chat (kirim pesan), drawer menu, rematch.
-- Server: penyajian file statis, `/api/config`, `/api/usersig` (503 bila env kosong).
+- Wiring P2P: dua tab join kamar yang sama → saling `hello`, warna putih/hitam
+  komplemen, langkah tersinkron (termasuk desync-recovery via FEN).
+- Server statis lokal menyajikan semua aset (200) tanpa dependensi.

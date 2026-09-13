@@ -1,19 +1,19 @@
 {
   "name": "catur-romantis",
   "version": "1.0.0",
-  "description": "Permainan catur romantis 2 pemain dengan chat & suara (Tencent TIM + TRTC), mobile friendly",
-  "main": "api/usersig.js",
+  "description": "Catur romantis 2 pemain untuk LDR — chat, papan sinkron, dan voice langsung antar browser (Trystero P2P/WebRTC). Gratis, tanpa API key.",
   "type": "commonjs",
   "scripts": {
     "start": "node local/server.js",
-    "dev": "node --watch local/server.js"
+    "dev": "node --watch local/server.js",
+    "vendor": "esbuild vendor/trystero-entry.mjs --bundle --format=iife --minify --outfile=vendor/trystero.js"
   },
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2"
-  },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "trystero": "^0.25.4",
+    "esbuild": "^0.25.0"
+  }
 }

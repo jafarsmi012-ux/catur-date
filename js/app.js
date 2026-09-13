@@ -453,6 +453,25 @@
     $('btn-mute').addEventListener('click', toggleMuteBtn);
   }
 
+  /**
+   * Undo online yang sinkron di KEDUA papan (dipakai peminta & penyetuju).
+   * Aturan: bila sekarang giliran pihak peminta undo, langkah terakhir papan
+   * adalah (kita balas + dia minta undo dicabut) -> mundur 2 plies; jika tidak
+   * cukup 1. Kedua papan identik saat protokol jalan, jadi rumus yang sama
+   * menghasilkan posisi yang sama di keduanya.
+   */
+  function applyUndoShared(reqColor) {
+    const g = state.game;
+    if (state.over || g.history().length === 0) return;
+    const plies = g.turn() === (reqColor || state.myColor) ? 2 : 1;
+    for (let i = 0; i < plies && g.history().length > 0; i++) g.undo();
+    state.undoReqColor = null;
+    state.selected = null;
+    syncLastMove();
+    Snd.undo();
+    refreshAll();
+  }
+
   function onUndo() {
     if (state.over) { toast('Permainan sudah selesai'); return; }
     if (state.mode === 'local') {
@@ -671,12 +690,15 @@
       $('peer-state').className = 'peer-state on';
       bubble('sys', null, state.peerName + ' masuk kamar 💕');
       Snd.chat();
-      // sinkron warna: deterministik (owner/pembuat grup putih, pengikut hitam)
-      const iAmWhite = decideColor(ev.from, !!ev.data.created);
-      state.myColor = iAmWhite ? 'w' : 'b';
-      state.flipped = !iAmWhite;
-      refreshAll();
-      Net.send('hello_ack', { name: state.myName, created: !!Net._createdGroup });
+      // sinkron warna: jangan ubah bila permainanku sedang berjalan
+      // (lawan rejoin — dia yang harus ikut warnaku via hello_ack)
+      if (!state.game || state.game.history().length === 0) {
+        const iAmWhite = decideColor(ev.from, !!ev.data.created);
+        state.myColor = iAmWhite ? 'w' : 'b';
+        state.flipped = !iAmWhite;
+        refreshAll();
+      }
+      Net.send('hello_ack', { name: state.myName, created: !!Net._createdGroup, color: state.myColor });
     });
     Net.on('hello_ack', (ev) => {
       if (!state.peerOnline) {
@@ -686,11 +708,17 @@
         $('peer-state').textContent = 'online';
         $('peer-state').className = 'peer-state on';
         bubble('sys', null, state.peerName + ' ada di sini 💕');
-        // warna final: lawan bilang dia pembuat grup -> kita hitam
-        const iAmWhite = decideColor(ev.from, !!ev.data.created);
-        state.myColor = iAmWhite ? 'w' : 'b';
-        state.flipped = !iAmWhite;
-        refreshAll();
+      }
+      // lawan mengirim warna yang ia pegang (bisa jadi ia host yang sedang
+      // asyik main) -> selama game-ku masih kosong, aku ambil kebalikannya
+      const peerColor = ev.data && ev.data.color;
+      if (peerColor && (!state.game || state.game.history().length === 0)) {
+        const iAmWhite = peerColor !== 'w';
+        if (iAmWhite !== (state.myColor === 'w')) {
+          state.myColor = iAmWhite ? 'w' : 'b';
+          state.flipped = !iAmWhite;
+          refreshAll();
+        }
       }
     });
 
@@ -722,24 +750,23 @@
       state.undoReqColor = (ev.data && ev.data.color) || null;
       modal(`<div class="big-icon">🥺</div><h2>${esc(state.peerName)} minta undo</h2><p>Bolehkah langkah terakhir diambil kembali?</p>`,
         [
-          { label: 'Boleh 🥰', cls: 'btn-primary', onClick: () => Net.send('undo_ack', { color: state.undoReqColor }) },
+          {
+            label: 'Boleh 🥰', cls: 'btn-primary',
+            onClick: () => {
+              // penyetuju juga harus mundur di papannya sendiri (pakai aturan
+              // plies yang sama) — kalau tidak, kedua papan jadi beda
+              Net.send('undo_ack', { color: state.undoReqColor });
+              applyUndoShared(state.undoReqColor);
+              toast('Undo disetujui — langkah dibatalkan ↩️');
+            },
+          },
           { label: 'Jangan 😤', cls: 'btn-ghost', onClick: () => Net.send('undo_deny', {}) },
         ]);
     });
     Net.on('undo_ack', (ev) => {
-      // undo sinkron: pengambil keputusan undo = peminta; kurangi 2 plies bila
-      // sekarang giliran peminta (langkahnya kita+dia), selain itu 1 plies.
       hideModal();
-      const g = state.game;
-      if (state.over || g.history().length === 0) return;
       const reqColor = (ev.data && ev.data.color) || state.undoReqColor || state.myColor;
-      const plies = g.turn() === reqColor ? 2 : 1;
-      for (let i = 0; i < plies && g.history().length > 0; i++) g.undo();
-      state.undoReqColor = null;
-      state.selected = null;
-      syncLastMove();
-      Snd.undo();
-      refreshAll();
+      applyUndoShared(reqColor);
       toast('Undo disetujui — langkah dibatalkan ↩️');
     });
     Net.on('undo_deny', () => toast('Permintaan undo ditolak 😢'));
