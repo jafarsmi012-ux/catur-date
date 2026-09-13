@@ -46,15 +46,23 @@
     tim: null,
     voice: null, // wrapper TRTC di bawah
 
-    /** Pastikan grup chat ada; dibuat bila belum. */
+    /** Pastikan grup chat ada; dibuat bila belum. Catat pemilik grup (owner = putih). */
     async ensureGroup() {
       const tim = this.tim;
       const gid = this.groupId;
       this._createdGroup = false;
-      try {
-        const res = await tim.searchGroupByID(gid);
-        if (res.data && res.data.group) return; // sudah ada
-      } catch (e) { /* belum ada -> buat baru */ }
+      this._groupOwner = null;
+      const lookup = async () => {
+        try {
+          const res = await tim.searchGroupByID(gid);
+          if (res && res.data && res.data.group) {
+            this._groupOwner = res.data.group.ownerID || null;
+            return true;
+          }
+        } catch (e) { /* belum ada -> nanti dibuat */ }
+        return false;
+      };
+      if (await lookup()) return;
       try {
         await tim.createGroup({
           groupID: gid,
@@ -63,16 +71,19 @@
           joinOption: TIM.TYPES.JOIN_OPTIONS_FREE_ACCESS,
         });
         this._createdGroup = true; // kita pemilik grup -> putih
+        this._groupOwner = this.userId;
       } catch (e) {
-        // 10025: sudah jadi anggota / grup sudah ada — kita pengikut -> hitam
-        if (String(e.code) !== '10025') throw e;
+        // 10025: pesaing membuat grup sepersekian detik lebih dulu — cari pemiliknya
+        if (String(e && e.code) !== '10025') throw e;
+        await lookup();
       }
     },
 
     async connect(opts) {
-      // opts: { roomCode, userName }
+      // opts: { roomCode, userName, displayName }
       this.roomCode = opts.roomCode;
       this.userId = opts.userName;
+      this.displayName = opts.displayName || null;
       this.groupId = 'catur-' + opts.roomCode.toLowerCase().replace(/[^a-z0-9-]/g, '');
       this.trtcRoomId = hash32(this.groupId);
       this.setMode('connecting');
@@ -110,15 +121,20 @@
           userSig: cred.userSig,
         });
         await this.ensureGroup();
-        await this.tim.joinGroup({ groupID: this.groupId });
-        // umumkan identitas (nama tampilan) + apakah kita pembuat grup (penantang = putih)
+        try {
+          await this.tim.joinGroup({ groupID: this.groupId });
+        } catch (e) {
+          // 10013: sudah jadi anggota (pembuat grup otomatis anggota) — aman diabaikan
+          if (String(e && e.code) !== '10013') throw e;
+        }
+        this.online = true; // WAJIB sebelum hello: send() menolak pesan saat offline
+        // umumkan identitas (nama tampilan) + status pembuat grup untuk bagi warna
         this._iCreatedGroup = this._createdGroup;
         await this.send('hello', {
-          name: this.userId,
+          name: this.displayName || this.userId,
           created: !!this._createdGroup,
           ts: Date.now(),
         });
-        this.online = true;
       } catch (e) {
         const msg = (e && (e.message || e.toString())) || '';
         this.setMode('error', 'Chat gagal: ' + msg.slice(0, 140));
@@ -212,7 +228,7 @@
 
       this.localStream = TRTC.createStream({ audio: true, video: false });
       await this.localStream.initialize();
-      await client.join({ roomId: this.trtcRoomId });
+      await client.join({ roomId: Number(this.trtcRoomId) }); // TRTC butuh angka, bukan string
       await client.publish(this.localStream);
       this.voiceState.joined = true;
       this.voiceState.muted = false;

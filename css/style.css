@@ -281,8 +281,6 @@ input { font: inherit; }
 }
 .sq.w .pc { color: var(--piece-w); text-shadow: 0 0 1.5px #4d1030, 0 1px 0 #4d1030; }
 .sq.b .pc { color: var(--piece-b); }
-.board.flipped .sq.w .pc { transform: rotate(180deg); }
-.board.flipped .sq.b .pc { transform: rotate(180deg); }
 
 /* koordinat kecil di tepi */
 .sq::before {

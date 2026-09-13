@@ -38,7 +38,7 @@
         const rank = 8 - Math.floor(idx / 8);
         const sq = file + rank;
         const div = document.createElement('div');
-        const dark = (idx + Math.floor(idx / 8)) % 2 === 0;
+        const dark = (idx + Math.floor(idx / 8)) % 2 === 1;
         div.className = 'sq ' + (dark ? 'dark' : 'light');
         div.dataset.sq = sq;
         // tampilkan huruf file di baris terbawah & angka rank di kolom paling kiri

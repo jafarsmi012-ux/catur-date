@@ -31,6 +31,7 @@
     over: false,
     drawOfferBy: null,       // userId penawar remis
     undoReqBy: null,
+    undoReqColor: null,      // warna pihak yang meminta undo (untuk protokol undo online)
     undoPendingMove: null,    // move terakhir untuk tombol undo online (2 langkah)
     unreadChat: 0,
     peerOnline: false,
@@ -121,8 +122,16 @@
       const room = $('in-room').value.trim().toLowerCase().replace(/\s+/g, '-');
       if (!room) { showSetupError('Isi dulu kode kamarnya ya 💕'); return; }
       $('btn-join').disabled = true;
-      const ok = await Net.connect({ roomCode: room, userName: slug(name) });
-      await waitChess();
+      // suffix acak agar dua nama mirip (slug sama) tidak saling tendang di TIM
+      const uid = slug(name) + '-' + Math.random().toString(36).slice(2, 6);
+      const ok = await Net.connect({ roomCode: room, userName: uid, displayName: name });
+      try {
+        await waitChess();
+      } catch (e) {
+        $('btn-join').disabled = false;
+        showSetupError('Mesin catur gagal dimuat — muat ulang halaman');
+        return;
+      }
       $('btn-join').disabled = false;
       if (ok) {
         state.mode = 'online';
@@ -144,7 +153,12 @@
       state.mode = 'local';
       state.myName = $('in-name').value.trim() || 'Kamu';
       state.peerName = 'Pemain 2';
-      await waitChess();
+      try {
+        await waitChess();
+      } catch (e) {
+        showSetupError('Mesin catur gagal dimuat — muat ulang halaman');
+        return;
+      }
       startGame();
     });
 
@@ -190,9 +204,9 @@
     $('me-name').textContent = state.myName;
     $('me-avatar').textContent = myAvatar;
     board = new Board(boardEl, { onSquareTapped: onSquareTapped });
-    // warna online: pembuat kamar (penantang) = putih; pengikut = hitam (papan dibalik)
+    // warna online: pemilik/pembuat grup = putih; pengikut = hitam (papan dibalik)
     if (state.mode === 'online') {
-      state.myColor = Net._createdGroup ? 'w' : 'b';
+      state.myColor = decideColor(null, false) ? 'w' : 'b';
       state.flipped = state.myColor === 'b';
     }
     refreshAll();
@@ -339,7 +353,11 @@
         cls: '',
         onClick: () => applyMove(state.promoPending.from, state.promoPending.to, m.promotion),
         keepOpen: false,
-      })).concat([{ label: 'Batal', cls: 'btn-ghost' }])
+      })).concat([{
+        label: 'Batal', cls: 'btn-ghost',
+        // WAJIB membersihkan promoPending — kalau tidak, papan terkunci selamanya
+        onClick: () => { state.promoPending = null; refreshAll(); },
+      }])
     );
     // tombol bidak promosi dibuat besar dan terlihat di papan
     const btns = $('modal-actions').querySelectorAll('button');
@@ -364,7 +382,8 @@
     checkGameEnd();
 
     if (state.mode === 'online') {
-      Net.send('move', { from, to, promo: promo || null, fen: g.fen(), n: g.history().length });
+      Net.send('move', { from, to, promo: promo || null, fen: g.fen(), n: g.history().length })
+        .then(ok => { if (!ok) toast('⚠️ Langkah tidak terkirim — cek koneksi 💔', 3500); });
     }
   }
 
@@ -377,8 +396,9 @@
         const winner = g.turn() === 'w' ? 'Hitam' : 'Putih';
         reason = 'Skakmat! ' + winner + ' menang 👑';
         icon = '👑';
-        (g.turn() === state.myColor || state.mode === 'local') ? Snd.lose() : Snd.win();
         if (state.mode === 'local') Snd.win();
+        else if (g.turn() === state.myColor) Snd.lose();
+        else Snd.win();
       } else if (g.in_stalemate()) {
         reason = 'Remis — pat (stalemate) 🤝';
       } else if (g.in_threefold_repetition()) {
@@ -443,10 +463,11 @@
       refreshAll();
       return;
     }
-    // online: minta izin lawan
+    // online: minta izin lawan — sertakan warna kita agar undo sinkron di kedua papan
     const n = state.game.history().length;
     if (n === 0) { toast('Belum ada langkah'); return; }
-    Net.send('undo_req', { n });
+    state.undoReqColor = state.myColor;
+    Net.send('undo_req', { n, color: state.myColor });
     toast('Permintaan undo dikirim… 🥺');
   }
 
@@ -624,6 +645,20 @@
   }
 
   // ================= NET EVENTS =================
+  /**
+   * Tentukan "apakah aku putih?" secara deterministik (kedua sisi harus
+   * menghasilkan jawaban yang sama):
+   * 1. pemilik grup TIM = putih (tetap stabil walau keduanya reload);
+   * 2. bila owner tak diketahui: pembuat grup pada sesi ini = putih;
+   * 3. rejoin grup lama tanpa info owner: userId lebih kecil = putih.
+   */
+  function decideColor(peerId, peerCreated) {
+    if (Net._groupOwner) return Net.userId === Net._groupOwner;
+    if (Net._createdGroup) return true;
+    if (peerCreated) return false;
+    return String(Net.userId) < String(peerId || '');
+  }
+
   function wireNetEvents() {
     Net.on('hello', (ev) => {
       // lawan bergabung
@@ -636,9 +671,8 @@
       $('peer-state').className = 'peer-state on';
       bubble('sys', null, state.peerName + ' masuk kamar 💕');
       Snd.chat();
-      // sinkron warna: pembuat grup (penantang) putih, pengikut hitam
-      const peerCreated = !!ev.data.created;
-      const iAmWhite = Net._createdGroup || !peerCreated;
+      // sinkron warna: deterministik (owner/pembuat grup putih, pengikut hitam)
+      const iAmWhite = decideColor(ev.from, !!ev.data.created);
       state.myColor = iAmWhite ? 'w' : 'b';
       state.flipped = !iAmWhite;
       refreshAll();
@@ -653,8 +687,7 @@
         $('peer-state').className = 'peer-state on';
         bubble('sys', null, state.peerName + ' ada di sini 💕');
         // warna final: lawan bilang dia pembuat grup -> kita hitam
-        const peerCreated = !!ev.data.created;
-        const iAmWhite = Net._createdGroup || !peerCreated;
+        const iAmWhite = decideColor(ev.from, !!ev.data.created);
         state.myColor = iAmWhite ? 'w' : 'b';
         state.flipped = !iAmWhite;
         refreshAll();
@@ -686,19 +719,28 @@
     Net.on('undo_req', (ev) => {
       if (state.over) return;
       Net._lastUndoBy = ev.from;
+      state.undoReqColor = (ev.data && ev.data.color) || null;
       modal(`<div class="big-icon">🥺</div><h2>${esc(state.peerName)} minta undo</h2><p>Bolehkah langkah terakhir diambil kembali?</p>`,
         [
-          { label: 'Boleh 🥰', cls: 'btn-primary', onClick: () => Net.send('undo_ack', {}) },
+          { label: 'Boleh 🥰', cls: 'btn-primary', onClick: () => Net.send('undo_ack', { color: state.undoReqColor }) },
           { label: 'Jangan 😤', cls: 'btn-ghost', onClick: () => Net.send('undo_deny', {}) },
         ]);
     });
-    Net.on('undo_ack', () => {
-      state.game.undo();
+    Net.on('undo_ack', (ev) => {
+      // undo sinkron: pengambil keputusan undo = peminta; kurangi 2 plies bila
+      // sekarang giliran peminta (langkahnya kita+dia), selain itu 1 plies.
+      hideModal();
+      const g = state.game;
+      if (state.over || g.history().length === 0) return;
+      const reqColor = (ev.data && ev.data.color) || state.undoReqColor || state.myColor;
+      const plies = g.turn() === reqColor ? 2 : 1;
+      for (let i = 0; i < plies && g.history().length > 0; i++) g.undo();
+      state.undoReqColor = null;
+      state.selected = null;
       syncLastMove();
       Snd.undo();
       refreshAll();
       toast('Undo disetujui — langkah dibatalkan ↩️');
-      hideModal();
     });
     Net.on('undo_deny', () => toast('Permintaan undo ditolak 😢'));
 
