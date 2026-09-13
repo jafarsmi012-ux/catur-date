@@ -4,9 +4,9 @@
  * Catatan keamanan: SECRETKEY tidak pernah dikirim ke browser; endpoint ini
  * yang menandatangani identitas pemain. Berlaku 180 hari.
  */
-const { Sig } = require('./lib/TLSAPI.js');
+const LibGenerateTestUserSig = require('./lib/LibGenerateTestUserSig.js');
 
-const SIG_EXPIRE_DAYS = 180;
+const EXPIRE_SECONDS = 180 * 24 * 3600;
 
 module.exports = (req, res) => {
   const SDKAPPID = Number(process.env.SDKAPPID || 0);
@@ -20,10 +20,9 @@ module.exports = (req, res) => {
   if (!user) return res.status(400).json({ error: 'Parameter "user" kosong/tidak valid' });
 
   try {
-    const sig = new Sig({ sdk_appid: SDKAPPID });
-    sig.setPrivateKey(SECRETKEY.replace(/\\n/g, '\n'));
-    sig.expire_after = String(SIG_EXPIRE_DAYS * 24 * 3600);
-    res.json({ sdkAppId: SDKAPPID, userId: user, userSig: sig.genSig(user) });
+    const generator = new LibGenerateTestUserSig(SDKAPPID, SECRETKEY, EXPIRE_SECONDS);
+    const userSig = generator.genTestUserSig(user);
+    res.json({ sdkAppId: SDKAPPID, userId: user, userSig });
   } catch (e) {
     console.error('gagal buat usersig:', e.message);
     res.status(500).json({ error: 'Gagal membuat UserSig: ' + e.message });

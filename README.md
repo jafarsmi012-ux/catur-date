@@ -25,8 +25,8 @@ Tema romantis merah muda, responsif untuk layar ponsel, plus **chat teks** dan
 index.html, css/, js/, vendor/   # frontend statis (di root — konvensi Vercel)
 api/config.js                    # GET /api/config
 api/usersig.js                   # GET /api/usersig?user=… (tanda tangan UserSig)
-api/lib/TLSAPI.js                # generator UserSig (tls-sig-api resmi Tencent)
-server.js                        # server Express untuk jalan LOKAL saja
+api/lib/LibGenerateTestUserSig.js  # generator UserSig resmi Tencent (HMAC-SHA256)
+local/server.js                  # server Express untuk jalan LOKAL saja
 ```
 
 Endpoint API ditulis sebagai *serverless functions* Vercel (`/api/*.js`),

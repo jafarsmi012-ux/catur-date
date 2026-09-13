@@ -18,8 +18,9 @@ const { execFileSync } = require('child_process');
 const express = require('express');
 
 // handler serverless dipakai ulang untuk server lokal
-const configHandler = require('./api/config.js');
-const usersigHandler = require('./api/usersig.js');
+const ROOT = path.join(__dirname, '..');
+const configHandler = require(path.join(ROOT, 'api', 'config.js'));
+const usersigHandler = require(path.join(ROOT, 'api', 'usersig.js'));
 
 const PORT = Number(process.env.PORT || 3100);
 const USE_HTTPS = process.env.USE_HTTPS === '1';
@@ -28,7 +29,7 @@ const app = express();
 app.disable('x-powered-by');
 
 // statis dari root proyek
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(ROOT));
 // endpoint API sama seperti di Vercel
 app.get('/api/config', (req, res) => configHandler(req, res));
 app.get('/api/usersig', (req, res) => usersigHandler(req, res));
@@ -46,7 +47,7 @@ function localIPs() {
 }
 
 function selfSignedCert() {
-  const dir = path.join(__dirname, 'certs');
+  const dir = path.join(__dirname, "certs");
   const key = path.join(dir, 'key.pem');
   const crt = path.join(dir, 'cert.pem');
   if (!fs.existsSync(key) || !fs.existsSync(crt)) {
