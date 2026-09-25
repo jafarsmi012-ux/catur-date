@@ -90,7 +90,8 @@
     for (const b of buttons || []) {
       const btn = document.createElement('button');
       btn.className = 'btn ' + (b.cls || 'btn-ghost');
-      btn.textContent = b.label;
+      if (b.html) btn.innerHTML = b.label;
+      else btn.textContent = b.label;
       btn.addEventListener('click', () => { if (!b.keepOpen) hideModal(); b.onClick && b.onClick(); });
       act.appendChild(btn);
     }
@@ -247,7 +248,8 @@
   }
 
   function turnLabel() {
-    return state.game.turn() === 'w' ? 'Putih ♔' : 'Hitam ♚';
+    // 👑 dipakai alih-alih ♔/♚ (glyph unicode bercorak salib)
+    return state.game.turn() === 'w' ? 'Putih 👑' : 'Hitam 👑';
   }
 
   function updateTurnChips() {
@@ -268,12 +270,12 @@
     // sesuaikan label: online -> "kamu" selalu warna state.myColor
     const mine = state.myColor === 'w' ? capByW : capByB;
     const theirs = state.myColor === 'w' ? capByB : capByW;
-    $('captured-me').textContent = mine.length ? 'Kamu makan: ' + mine.join(' ') : '';
-    $('captured-peer').textContent = theirs.length ? 'Dia makan: ' + theirs.join(' ') : '';
+    $('captured-me').innerHTML = mine.length ? 'Kamu makan: ' + mine.join(' ') : '';
+    $('captured-peer').innerHTML = theirs.length ? 'Dia makan: ' + theirs.join(' ') : '';
   }
+  // putih = outline gelap, hitam = solid gelap — konsisten dengan papan (SVG tanpa salib)
   function symbol(type, color) {
-    const map = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' };
-    return color === 'w' ? map[type] : map[type].toLowerCase();
+    return `<span class="pc-cap ${color}">${Board.svg(type)}</span>`;
   }
 
   function updateMoves() {
@@ -346,11 +348,13 @@
   }
 
   function askPromotion(moves) {
+    const color = state.game.turn(); // warna pion yang mempromosi
     modal(
       `<div class="big-icon">👑</div><h2>Pion jadi apa?</h2>`,
       moves.map(m => ({
-        label: symbol(m.promotion, 'w'),
-        cls: '',
+        label: symbol(m.promotion, color),
+        html: true,
+        cls: 'promo-btn ' + color,
         onClick: () => applyMove(state.promoPending.from, state.promoPending.to, m.promotion),
         keepOpen: false,
       })).concat([{
@@ -359,9 +363,6 @@
         onClick: () => { state.promoPending = null; refreshAll(); },
       }])
     );
-    // tombol bidak promosi dibuat besar dan terlihat di papan
-    const btns = $('modal-actions').querySelectorAll('button');
-    btns.forEach(b => { if (b.textContent.length <= 2) b.classList.add('promo-btn'); });
   }
 
   function applyMove(from, to, promo) {

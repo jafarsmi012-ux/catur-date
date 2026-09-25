@@ -18,8 +18,11 @@
   --sq-dark: #ec9cb8;       /* kotak merah muda papan */
   --sq-light-2: #ffc9dc;
   --sq-dark-2: #e087a5;
-  --piece-w: #fff7fb;
-  --piece-b: #4d1030;
+  --piece-w: #ffffff;
+  --piece-b: #38081f;
+  /* garis tepi gelap untuk bidak putih supaya kontras di kotak terang */
+  --piece-stroke: -1.5px -1.5px 0 #4d1030, 1.5px -1.5px 0 #4d1030,
+    -1.5px 1.5px 0 #4d1030, 1.5px 1.5px 0 #4d1030, 0 2.5px 0 #4d1030;
   --danger: #ff5470;
   --ok: #6ee7a0;
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
@@ -279,8 +282,34 @@ input { font: inherit; }
   filter: drop-shadow(0 2px 2px rgba(77, 16, 48, 0.35));
   transition: transform 0.15s;
 }
-.sq.w .pc { color: var(--piece-w); text-shadow: 0 0 1.5px #4d1030, 0 1px 0 #4d1030; }
-.sq.b .pc { color: var(--piece-b); }
+.sq.w .pc { color: var(--piece-w); text-shadow: var(--piece-stroke); }
+.sq.b .pc { color: var(--piece-b); text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3); }
+
+/* Bidak SVG (tanpa corak salib) mengikuti warna bidak via currentColor.
+   Butuh outline terang/gelap secukupnya agar kontras di kedua warna kotak. */
+.pc-svg {
+  width: 88%;
+  height: 88%;
+  display: block;
+  fill: currentColor;
+  filter: drop-shadow(0 1px 1.5px rgba(77, 16, 48, 0.45));
+}
+.sq.w .pc-svg { stroke: #4d1030; stroke-width: 4; paint-order: stroke fill; }
+.sq.b .pc-svg { stroke: #ffd7e6; stroke-width: 3; paint-order: stroke fill; }
+
+/* SVG bidak di daftar captured (warna mengikuti konteks, pakai warna teks) */
+.pc-cap { display: inline-block; width: 1.35em; height: 1.35em; vertical-align: -0.25em; }
+.pc-cap svg { width: 100%; height: 100%; display: block; }
+.pc-cap.w { color: #ffffff; }
+.pc-cap.w svg { filter: drop-shadow(0 0 0.7px #4d1030) drop-shadow(0 0 0.7px #4d1030) drop-shadow(0 0 0.7px #4d1030); }
+.pc-cap.b { color: #2a0516; }
+.pc-cap.b svg { filter: drop-shadow(0 0 0.8px #ffd7e6) drop-shadow(0 0 0.8px #ffd7e6); }
+
+/* Dialog promosi: tombol berisi SVG bidak sesuai warna */
+.promo-btn svg { width: 44px; height: 44px; fill: currentColor; }
+.promo-btn.w { color: var(--piece-w); }
+.promo-btn.w svg { filter: drop-shadow(0 0 1px #4d1030) drop-shadow(0 0 1px #4d1030); }
+.promo-btn.b { color: var(--piece-b); }
 
 /* koordinat kecil di tepi */
 .sq::before {
@@ -486,9 +515,11 @@ input { font: inherit; }
 }
 .promo-btn {
   font-size: 36px !important; min-width: 74px !important;
-  background: var(--sq-light) !important; color: var(--piece-b) !important;
+  background: var(--sq-light) !important;
   border: 2px solid var(--pink);
 }
+.promo-btn.w { color: var(--piece-w) !important; text-shadow: var(--piece-stroke); }
+.promo-btn.b { color: var(--piece-b) !important; }
 
 /* ================= TOAST ================= */
 #toast-box {
