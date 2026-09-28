@@ -138,10 +138,12 @@
         let html = '';
         if (cell) {
           html = `<span class="pc">${PIECE_SVG[cell.type]}</span>`;
-          el.classList.add(cell.color); // .w / .b untuk pewarnaan
-        } else {
-          el.classList.remove('w', 'b');
         }
+        // toggle (bukan add) supaya kelas warna lama ikut hilang — kalau tidak,
+        // kotak yang berpindah tangan (mis. bidak putih memakan bidak hitam)
+        // akan menyimpan dua kelas w+b sekaligus dan bidak tampak salah warna
+        el.classList.toggle('w', !!(cell && cell.color === 'w'));
+        el.classList.toggle('b', !!(cell && cell.color === 'b'));
         if (view.moves && view.moves[sq]) {
           html += view.moves[sq] === 'capture'
             ? '<span class="ring"></span>'
